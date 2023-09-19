@@ -3,7 +3,7 @@
 <head>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>Document</title>
+    <title>WebGL Application</title>
 </head>
 <body>
     <canvas id="glCanvas" width="800" height="600"></canvas>
@@ -17,10 +17,10 @@
         // Step 3: Compile shaders
         const vertexShaderSource = `
             // Vertex shader code (GLSL)
+            attribute vec2 a_position;
             void main() {
                 // Transform vertex position
-                gl_PointSize = 10.0; // Set point size
-                gl_Position = vec4(0.0, 0.0, 0.0, 1.0);
+                gl_Position = vec4(a_position, 0.0, 1.0);
             }
         `;
 
@@ -28,7 +28,7 @@
             // Fragment shader code (GLSL)
             void main() {
                 // Set fragment color
-                gl_FragColor = vec4(1.0, 0.0, 0.0, 1.0);
+                gl_FragColor = vec4(1.0, 0.0, 1.0, 1.0);    // FUCHSIA
             }
         `;
 
@@ -48,8 +48,19 @@
         gl.useProgram(program);
 
         // Step 5: Set up attributes and uniforms
+        const positionAttributeLocation = gl.getAttribLocation(program, 'a_position');
+        const positionBuffer = gl.createBuffer();
+        const positionData = new Float32Array([
+            -0.5, -0.5,  // Vertex 1
+             0.5, -0.5,  // Vertex 2
+             0.5,  0.5,  // Vertex 3
+        ]);
 
         // Step 6: Create and bind buffers
+        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, positionData, gl.STATIC_DRAW);
+        gl.enableVertexAttribArray(positionAttributeLocation);
+        gl.vertexAttribPointer(positionAttributeLocation, 2, gl.FLOAT, false, 0, 0);
 
         // Step 7: Rendering loop
         gl.clearColor(0.0, 0.0, 0.0, 1.0);
@@ -58,8 +69,8 @@
             // Clear canvas
             gl.clear(gl.COLOR_BUFFER_BIT);
 
-            // Draw the point
-            gl.drawArrays(gl.POINTS, 0, 1);
+            // Draw the lines using gl.drawArrays
+            gl.drawArrays(gl.LINE_LOOP, 0, 3);
 
             requestAnimationFrame(render);
         }
