@@ -26,9 +26,13 @@
 
         const fragmentShaderSource = `
             // Fragment shader code (GLSL)
+            precision mediump float;
+            uniform float u_time;
             void main() {
-                // Set fragment color
-                gl_FragColor = vec4(1.0, 0.0, 1.0, 1.0);    // FUCHSIA
+                vec4 fuchsiaColor = vec4(1.0, 0.0, 1.0, 1.0);
+                vec4 blackColor = vec4(0.0, 0.0, 0.0, 1.0);
+                vec4 interpolatedColor = mix(fuchsiaColor, blackColor, u_time);
+                gl_FragColor = interpolatedColor;
             }
         `;
 
@@ -67,8 +71,16 @@
 
         // Step 7: Rendering loop
         gl.clearColor(0.0, 0.0, 0.0, 1.0);
+        const startTime = performance.now();
 
         function render() {
+            const currentTime = performance.now();
+            const elapsedTime = (currentTime - startTime) / 1000.0; // Convert to seconds
+
+            // Pass the elapsed time to the fragment shader as a uniform
+            const timeUniformLocation = gl.getUniformLocation(program, 'u_time');
+            gl.uniform1f(timeUniformLocation, elapsedTime);
+
             // Clear canvas
             gl.clear(gl.COLOR_BUFFER_BIT);
 
