@@ -8,76 +8,137 @@
 <body>
     <canvas id="glCanvas" width="800" height="600"></canvas>
     <script>
-        // Step 1: Set up the canvas
-        const canvas = document.getElementById('glCanvas');
+        // Create a canvas element
+        const canvas = document.createElement('canvas');
+        canvas.width = 800;
+        canvas.height = 600;
+        document.body.appendChild(canvas);
 
-        // Step 2: Initialize WebGL context
-        const gl = canvas.getContext('webgl');
+        // Initialize the WebGPU context
+        async function init() {
+        const adapter = await navigator.gpu.requestAdapter();
+        const device = await adapter.requestDevice();
 
-        // Step 3: Compile shaders
-        const vertexShaderSource = `
-            // Vertex shader code (GLSL)
-            attribute vec2 a_position;
-            void main() {
-                // Transform vertex position
-                gl_Position = vec4(a_position, 0.0, 1.0);
-            }
-        `;
+        // Create a WebGPU context
+        const context = canvas.getContext('gpupresent');
 
-        const fragmentShaderSource = `
-            // Fragment shader code (GLSL)
-            void main() {
-                // Set fragment color
-                gl_FragColor = vec4(1.0, 0.0, 1.0, 1.0);    // FUCHSIA
-            }
-        `;
-
-        const vertexShader = gl.createShader(gl.VERTEX_SHADER);
-        gl.shaderSource(vertexShader, vertexShaderSource);
-        gl.compileShader(vertexShader);
-
-        const fragmentShader = gl.createShader(gl.FRAGMENT_SHADER);
-        gl.shaderSource(fragmentShader, fragmentShaderSource);
-        gl.compileShader(fragmentShader);
-
-        // Step 4: Create and link program
-        const program = gl.createProgram();
-        gl.attachShader(program, vertexShader);
-        gl.attachShader(program, fragmentShader);
-        gl.linkProgram(program);
-        gl.useProgram(program);
-
-        // Step 5: Set up attributes and uniforms
-        const positionAttributeLocation = gl.getAttribLocation(program, 'a_position');
-        const positionBuffer = gl.createBuffer();
-        const positionData = new Float32Array([
-            -0.5, -0.5,  // Vertex 1
-             0.5, -0.5,  // Vertex 2
-             0.5,  0.5,  // Vertex 3
-            -0.5, -0.5,  // Vertex 4
-             0.5, -0.5,  // Vertex 5
-             0.5,  0.5   // Vertex 6
+        // Define the vertex data for a triangle
+        const vertices = new Float32Array([
+            0.0,  0.5, 0.0,
+        -0.5, -0.5, 0.0,
+            0.5, -0.5, 0.0,
         ]);
 
-        // Step 6: Create and bind buffers
-        gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
-        gl.bufferData(gl.ARRAY_BUFFER, positionData, gl.STATIC_DRAW);
-        gl.enableVertexAttribArray(positionAttributeLocation);
-        gl.vertexAttribPointer(positionAttributeLocation, 2, gl.FLOAT, false, 0, 0);
+        // Create a buffer to store the vertex data
+        const buffer = device.createBuffer({
+            size: vertices.byteLength,
+            usage: GPUBufferUsage.VERTEX,
+            mappedAtCreation: true,
+        });
+        new Float32Array(buffer.getMappedRange()).set(vertices);
+        buffer.unmap();
 
-        // Step 7: Rendering loop
-        gl.clearColor(0.0, 0.0, 0.0, 1.0);
+        // Load and compile shaders (vertex and fragment shaders)
+        const vertexShaderModule = device.createShaderModule({
+            code: `
+            #version 450
+            layout(location = 0) in vec3 inPosition;
+            void main() {
+                gl_Position = vec4(inPosition, 1.0);
+            }
+            `,
+        });
 
-        function render() {
-            // Clear canvas
-            gl.clear(gl.COLOR_BUFFER_BIT);
+        const fragmentShaderModule = device.createShaderModule({
+            code: `
+            #version 450
+            layout(location = 0) out vec4 fragColor;
+            void main() {
+                fragColor = vec4(1.0, 0.0, 0.0, 1.0); // Red color for lines
+            }
+            `,
+        });
 
-            // Draw the lines using gl.drawArrays
-            gl.drawArrays(gl.LINES, 0, 6);
+        // Create a pipeline layout
+        const pipelineLayout = device.createPipelineLayout({ bindGroupLayouts: [] });
 
-            requestAnimationFrame(render);
+        // Create a texture and a texture view manually
+        const textureDescriptor = {
+            size: { width: canvas.width, height: canvas.height, depthOrArrayLayers: 1 },
+            format: 'rgba8unorm',
+            usage: GPUTextureUsage.RENDER_ATTACHMENT | GPUTextureUsage.COPY_SRC,
+        };
+        const texture = device.createTexture(textureDescriptor);
+        const textureView = texture.createView();
+
+        // Create a render pipeline
+        const pipeline = device.createRenderPipeline({
+            layout: pipelineLayout,
+            vertex: {
+            module: vertexShaderModule,
+            entryPoint: 'main',
+            },
+            fragment: {
+            module: fragmentShaderModule,
+            entryPoint: 'main',
+            targets: [
+                {
+                format: 'rgba8unorm',
+                view: textureView,
+                loadValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+                storeOp: 'store',
+                },
+            ],
+            },
+            primitive: {
+            topology: 'triangle-list',
+            },
+        });
+
+        // Create a bind group
+        const bindGroup = device.createBindGroup({
+            layout: pipeline.getBindGroupLayout(0),
+            entries: [
+            {
+                binding: 0,
+                resource: {
+                buffer: buffer,
+                offset: 0,
+                size: vertices.byteLength,
+                },
+            },
+            ],
+        });
+
+        // Create a command encoder
+        const commandEncoder = device.createCommandEncoder();
+
+        // Begin a render pass
+        const renderPassDescriptor = {
+            colorAttachments: [
+            {
+                view: textureView,
+                loadValue: { r: 0.0, g: 0.0, b: 0.0, a: 1.0 },
+                storeOp: 'store',
+            },
+            ],
+        };
+        const passEncoder = commandEncoder.beginRenderPass(renderPassDescriptor);
+        passEncoder.setPipeline(pipeline);
+        passEncoder.setBindGroup(0, bindGroup);
+        passEncoder.draw(3, 1, 0, 0);
+        passEncoder.endPass();
+
+        // Finish rendering
+        device.queue.submit([commandEncoder.finish()]);
+
+        // Present the texture on the canvas
+        context.present(textureView);
         }
-        render();
+
+        init();
+
+
     </script>
 </body>
 </html>
