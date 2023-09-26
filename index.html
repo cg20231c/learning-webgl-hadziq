@@ -100,6 +100,7 @@
             varying vec4 v_color;
             uniform mat4 u_viewprojectionMatrix;
             uniform float u_d;
+            uniform mat4 u_rotateZ;
 
             void main() {
                 mat4 translate = mat4(
@@ -122,7 +123,7 @@
                     sind, 0.0, cosd, 0.0,
                     0.0, 0.0, 0.0, 1.0
                 );
-                gl_Position = u_viewprojectionMatrix * rotateX * rotateY * a_position;
+                gl_Position = u_viewprojectionMatrix * u_rotateZ * rotateY * rotateX * a_position;
                 v_color = a_color;
             }
         `;
@@ -210,10 +211,16 @@
         // Variable for animation
         let d = 0;
         const dUniformLocation = gl.getUniformLocation(program, 'u_d');
+        let rotateZMatrix = mat4.create();
+
+        // Transformation matrix
+        const rotateZUniformLocation = gl.getUniformLocation(program, 'u_rotateZ');
 
         function render() {
             d += 0.01;
             gl.uniform1f(dUniformLocation, d);
+            mat4.rotateZ(rotateZMatrix, rotateZMatrix, 0.01);
+            gl.uniformMatrix4fv(rotateZUniformLocation, false, rotateZMatrix);
 
             // Clear canvas
             gl.clear(gl.COLOR_BUFFER_BIT);
