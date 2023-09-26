@@ -99,9 +99,12 @@
             attribute vec4 a_color;
             varying vec4 v_color;
             uniform mat4 u_viewprojectionMatrix;
+            uniform float u_d;
 
             void main() {
-                gl_Position = u_viewprojectionMatrix * a_position;
+                vec4 position = a_position;
+                position.x += u_d;
+                gl_Position = u_viewprojectionMatrix * position;
                 v_color = a_color;
             }
         `;
@@ -183,23 +186,19 @@
 
         // Rendering loop
         gl.clearColor(0.0, 0.0, 0.0, 1.0);
-        //const startTime = performance.now();
+        gl.enable(gl.DEPTH_TEST);
+        gl.viewport(0, 0, canvas.width, canvas.height);
+        
+        // Variable for animation
+        let d = 0;
+        const dUniformLocation = gl.getUniformLocation(program, 'u_d');
 
         function render() {
-            //const currentTime = performance.now();
-            //const elapsedTime = (currentTime - startTime) / 1000.0; // Convert to seconds
-
-            // Pass the elapsed time to the fragment shader as a uniform
-            //const timeUniformLocation = gl.getUniformLocation(program, 'u_time');
-            //gl.uniform1f(timeUniformLocation, elapsedTime);
+            d += 0.01;
+            gl.uniform1f(dUniformLocation, d);
 
             // Clear canvas
             gl.clear(gl.COLOR_BUFFER_BIT);
-
-            gl.enable(gl.DEPTH_TEST);
-            gl.viewport(0, 0, canvas.width, canvas.height);
-
-            gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
             gl.drawElements(gl.TRIANGLES, cubeIndices.length, gl.UNSIGNED_SHORT, 0);
 
             requestAnimationFrame(render);
