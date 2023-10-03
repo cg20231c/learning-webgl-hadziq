@@ -56,7 +56,32 @@
             1.0, 0.0, 0.0, 1.0,
             1.0, 0.0, 0.0, 1.0,
             1.0, 0.0, 0.0, 1.0,
-            // Back face (Green)
+            // Front face (Red)
+            1.0, 0.0, 0.0, 1.0,
+            1.0, 0.0, 0.0, 1.0,
+            1.0, 0.0, 0.0, 1.0,
+            1.0, 0.0, 0.0, 1.0,
+            // Front face (Red)
+            1.0, 0.0, 0.0, 1.0,
+            1.0, 0.0, 0.0, 1.0,
+            1.0, 0.0, 0.0, 1.0,
+            1.0, 0.0, 0.0, 1.0,
+            // Front face (Red)
+            1.0, 0.0, 0.0, 1.0,
+            1.0, 0.0, 0.0, 1.0,
+            1.0, 0.0, 0.0, 1.0,
+            1.0, 0.0, 0.0, 1.0,
+            // Front face (Red)
+            1.0, 0.0, 0.0, 1.0,
+            1.0, 0.0, 0.0, 1.0,
+            1.0, 0.0, 0.0, 1.0,
+            1.0, 0.0, 0.0, 1.0,
+            // Front face (Red)
+            1.0, 0.0, 0.0, 1.0,
+            1.0, 0.0, 0.0, 1.0,
+            1.0, 0.0, 0.0, 1.0,
+            1.0, 0.0, 0.0, 1.0,
+            /*// Back face (Green)
             0.0, 1.0, 0.0, 1.0,
             0.0, 1.0, 0.0, 1.0,
             0.0, 1.0, 0.0, 1.0,
@@ -80,7 +105,7 @@
             1.0, 0.5, 0.0, 1.0,
             1.0, 0.5, 0.0, 1.0,
             1.0, 0.5, 0.0, 1.0,
-            1.0, 0.5, 0.0, 1.0,
+            1.0, 0.5, 0.0, 1.0,*/
         ]);
 
         // Define cube faces (using indices)
@@ -133,9 +158,12 @@
         const fragmentShaderSource = `
             precision mediump float;
             varying vec4 v_color;
+            uniform vec3 uAmbientColor;
 
             void main() {
-                gl_FragColor = v_color;
+                // Combine ambient, diffuse, and specular lighting
+                vec3 lightColor = uAmbientColor; // + diffuse + specular;
+                gl_FragColor = vec4(lightColor * v_color.rgb, v_color.a);
             }
         `;
 
@@ -208,8 +236,17 @@
         gl.clearColor(0.0, 0.0, 0.0, 1.0);
         gl.enable(gl.DEPTH_TEST);
         gl.viewport(0, 0, canvas.width, canvas.height);
+        // Enable blending or transparency
+        //gl.enable(gl.BLEND);
+        // Set the blend function (commonly used for transparency)
+        //gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
+
+        // Varibles for lighting and shading
+        var ambientColor = vec3.fromValues(1.0, 0.0, 1.0);
+        var uAmbientColor = gl.getUniformLocation(program, "uAmbientColor");
+        gl.uniform3fv(uAmbientColor, ambientColor);
         
-        // Variable for animation
+        // Variables for animation
         let angle = 0.0;
         const angleUniformLocation = gl.getUniformLocation(program, 'u_angle');
         let rotateZMatrix = mat4.create();
