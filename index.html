@@ -163,10 +163,13 @@
             uniform vec3 u_pointLightPosition; // Position of the point light
             uniform vec3 u_pointLightColor;    // Color of the point light
             uniform float u_pointLightIntensity; // Intensity of the point light
+            uniform vec3 u_cameraPosition; // Add this uniform for specular calculations
+            uniform float u_materialShininess; // Shininess of the material
 
             void main() {
                 // Normalize the normal vector
                 vec3 normal = normalize(v_normal);
+                vec3 viewDir = normalize(u_cameraPosition - v_fragPos);
 
                 // Directional light direction
                 vec3 lightDirection = normalize(u_directionalLightDirection);
@@ -182,8 +185,13 @@
                 // Calculate the final color with point light lighting
                 vec3 diffuseColorPoint = u_pointLightColor * diff * u_pointLightIntensity;
 
+                // Specular lighting calculations
+                vec3 lightDirSpecular = normalize(-u_directionalLightDirection);
+                vec3 reflectedDir = reflect(-lightDirSpecular, normal);
+                float specular = pow(max(dot(viewDir, reflectedDir), 0.0), u_materialShininess);
+
                 // Combine ambient, diffuse, and specular lighting
-                vec3 lightColor = uAmbientColor + diffuseColorDirectional + diffuseColorPoint; // + specular;
+                vec3 lightColor = uAmbientColor + diffuseColorDirectional + diffuseColorPoint + (u_directionalLightColor * specular);
                 gl_FragColor = vec4(lightColor * v_color.rgb, v_color.a);
             }
         `;
@@ -271,14 +279,17 @@
 
         // Varibles for lighting and shading
         const ambientColor = vec3.fromValues(0.2, 0.2, 0.2);  // [0.2, 0.2, 0.2];
-        const uAmbientColorLocation = gl.getUniformLocation(program, "uAmbientColor");// Get the uniform locations for directional light direction and color
+        const ambientColorLocation = gl.getUniformLocation(program, "uAmbientColor");// Get the uniform locations for directional light direction and color
         const directionalLightDirectionLocation = gl.getUniformLocation(program, 'u_directionalLightDirection');
         const directionalLightColorLocation = gl.getUniformLocation(program, 'u_directionalLightColor');
         const pointLightPositionLocation = gl.getUniformLocation(program, 'u_pointLightPosition');
         const pointLightColorLocation = gl.getUniformLocation(program, 'u_pointLightColor');
         const pointLightIntensityLocation = gl.getUniformLocation(program, 'u_pointLightIntensity');
+        const materialShininessLocation = gl.getUniformLocation(program, 'u_materialShininess');
+        const cameraPositionLocation = gl.getUniformLocation(program, 'u_cameraPosition');
         
-        gl.uniform3fv(uAmbientColorLocation, ambientColor);
+        gl.uniform3fv(ambientColorLocation, ambientColor);
+        gl.uniform3fv(cameraPositionLocation, cameraPosition);
 
         // Set the directional light direction (as a normalized vector)
         const directionalLightDirection = [0.0, 1.0, 0.0]; //[0.5, -0.5, -0.5]; // Adjust the direction as needed
@@ -299,6 +310,10 @@
         // Set the point light intensity (adjust as needed)
         const pointLightIntensity = 1.0; // Adjust the intensity as needed
         gl.uniform1f(pointLightIntensityLocation, pointLightIntensity);
+
+        // Set the material shininess (adjust as needed)
+        const materialShininess = 200.0; // Adjust the shininess value
+        gl.uniform1f(materialShininessLocation, materialShininess);
         
         // Variables for animation
         const traslationSpeed = 0.1;
@@ -332,10 +347,10 @@
 
         function render() {
             angle += angularSpeed;
-            mat4.rotateZ(modelMatrix, mat4.create(), angle);
+            mat4.translate(modelMatrix, mat4.create(), [d[0], 0.0, d[1]]);
+            mat4.rotateZ(modelMatrix, modelMatrix, angle);
             mat4.rotateY(modelMatrix, modelMatrix, angle);
             mat4.rotateX(modelMatrix, modelMatrix, angle);
-            mat4.translate(modelMatrix, modelMatrix, [d[0], 0.0, d[1]]);
             mat4.multiply(modelViewProjectionMatrix, viewProjectionMatrix, modelMatrix);
 
             // Pass the modelMatrix to shaders as a uniform
