@@ -122,34 +122,13 @@
         const vertexShaderSource = `
             attribute vec4 a_position;
             attribute vec4 a_color;
+            //attribute vec3 a_normal;
+            //varying vec3 v_normal;
             varying vec4 v_color;
-            uniform mat4 u_viewprojectionMatrix;
-            uniform vec2 u_d;
-            uniform mat4 u_rotateZ;
-            uniform float u_angle;
+            uniform mat4 u_modelViewProjectionMatrix;
 
             void main() {
-                mat4 translate = mat4(
-                    1.0, 0.0, 0.0, 0.0,
-                    0.0, 1.0, 0.0, 0.0,
-                    0.0, 0.0, 1.0, 0.0,
-                    u_d.x, 0.0, u_d.y, 1.0
-                );
-                float sind = sin(u_angle);
-                float cosd = cos(u_angle);
-                mat4 rotateX = mat4(
-                    1.0, 0.0, 0.0, 0.0,
-                    0.0, cosd, sind, 0.0,
-                    0.0, -sind, cosd, 0.0,
-                    0.0, 0.0, 0.0, 1.0
-                );
-                mat4 rotateY = mat4(
-                    cosd, 0.0, -sind, 0.0,
-                    0.0, 1.0, 0.0, 0.0,
-                    sind, 0.0, cosd, 0.0,
-                    0.0, 0.0, 0.0, 1.0
-                );
-                gl_Position = u_viewprojectionMatrix * translate * u_rotateZ * rotateY * rotateX * a_position;
+                gl_Position = u_modelViewProjectionMatrix * a_position;
                 v_color = a_color;
             }
         `;
@@ -199,7 +178,7 @@
         // Specify attribute and uniform locations
         const positionAttributeLocation = gl.getAttribLocation(program, 'a_position');
         const colorAttributeLocation = gl.getAttribLocation(program, 'a_color');
-        const viewProjectionMatrixLocation = gl.getUniformLocation(program, 'u_viewprojectionMatrix');
+        const modelViewProjectionMatrixLocation = gl.getUniformLocation(program, 'u_modelViewProjectionMatrix');
 
         // Set up attribute pointers
         gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
@@ -229,9 +208,6 @@
         const viewProjectionMatrix = mat4.create();
         mat4.multiply(viewProjectionMatrix, projectionMatrix, viewMatrix);
 
-        // Pass the viewProjectionMatrix to your shaders as a uniform
-        gl.uniformMatrix4fv(viewProjectionMatrixLocation, false, viewProjectionMatrix);
-
         // Rendering loop
         gl.clearColor(0.0, 0.0, 0.0, 1.0);
         gl.enable(gl.DEPTH_TEST);
@@ -242,18 +218,18 @@
         //gl.blendFunc(gl.SRC_ALPHA, gl.ONE_MINUS_SRC_ALPHA);
 
         // Varibles for lighting and shading
-        var ambientColor = vec3.fromValues(1.0, 0.0, 1.0);
+        var ambientColor = vec3.fromValues(0.2, 0.2, 0.2);  // [0.2, 0.2, 0.2];
         var uAmbientColor = gl.getUniformLocation(program, "uAmbientColor");
         gl.uniform3fv(uAmbientColor, ambientColor);
         
         // Variables for animation
-        let angle = 0.0;
-        const angleUniformLocation = gl.getUniformLocation(program, 'u_angle');
-        let rotateZMatrix = mat4.create();
         const traslationSpeed = 0.1;
+        let angle = 0.0;
+        const angularSpeed = 0.01;
 
         // Transformation matrix
-        const rotateZUniformLocation = gl.getUniformLocation(program, 'u_rotateZ');
+        let modelMatrix = mat4.create();
+        let modelViewProjectionMatrix = mat4.create();
 
         // Capture the event from the keyboard
         let d = [0.0, 0.0];
@@ -263,28 +239,29 @@
             switch (key) {
                 case 'ArrowUp':
                     d[1] -= traslationSpeed; // Move forward
-                    gl.uniform2fv(dUniformLocation, d);
                     break;
                 case 'ArrowDown':
                     d[1] += traslationSpeed; // Move backward
-                    gl.uniform2fv(dUniformLocation, d);
                     break;
                 case 'ArrowLeft':
                     d[0] -= traslationSpeed; // Move left
-                    gl.uniform2fv(dUniformLocation, d);
                     break;
                 case 'ArrowRight':
                     d[0] += traslationSpeed; // Move right
-                    gl.uniform2fv(dUniformLocation, d);
                     break;
             }
         });
 
         function render() {
-            angle += 0.01;
-            gl.uniform1f(angleUniformLocation, angle);
-            mat4.rotateZ(rotateZMatrix, rotateZMatrix, 0.01);
-            gl.uniformMatrix4fv(rotateZUniformLocation, false, rotateZMatrix);
+            angle += angularSpeed;
+            mat4.rotateZ(modelMatrix, mat4.create(), angle);
+            mat4.rotateY(modelMatrix, modelMatrix, angle);
+            mat4.rotateX(modelMatrix, modelMatrix, angle);
+            mat4.translate(modelMatrix, modelMatrix, [d[0], 0.0, d[1]]);
+            mat4.multiply(modelViewProjectionMatrix, viewProjectionMatrix, modelMatrix);
+
+            // Pass the modelViewProjectionMatrix to your shaders as a uniform
+            gl.uniformMatrix4fv(modelViewProjectionMatrixLocation, false, modelViewProjectionMatrix);
 
             // Clear canvas
             gl.clear(gl.COLOR_BUFFER_BIT);
