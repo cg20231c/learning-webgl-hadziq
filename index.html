@@ -15,6 +15,21 @@
         // Initialize WebGL context
         const gl = canvas.getContext('webgl');
 
+        let cubeTexture;
+        function loadTexture(gl, url) {
+            const texture = gl.createTexture();
+            const image = new Image();
+            image.onload = function() {
+                gl.bindTexture(gl.TEXTURE_2D, texture);
+                gl.texImage2D(gl.TEXTURE_2D, 0, gl.RGBA, gl.RGBA, gl.UNSIGNED_BYTE, image);
+                // Mipmaps for better texture quality
+                gl.generateMipmap(gl.TEXTURE_2D);
+            };
+            image.src = url;
+            return texture;
+        }
+        cubeTexture = loadTexture(gl, 'texture1/albedo.jpg');
+
         // Define cube vertices
         const cubeVertices = new Float32Array([
             // Front face
@@ -49,6 +64,7 @@
             -1.0, -1.0,  1.0,
         ]);
 
+        
         // Define Rubik's Cube colors for each face
         const cubeColors = new Float32Array([
             // Front face (Red)
@@ -82,6 +98,41 @@
             1.0, 0.5, 0.0, 1.0,
             1.0, 0.5, 0.0, 1.0,
         ]);
+        
+        const cubeTextureCoordinates = new Float32Array([
+            // Front face
+            0.0, 0.0,
+            1.0, 0.0,
+            1.0, 1.0,
+            0.0, 1.0,
+            // ... similar definitions for other faces ...
+            // Back face
+            0.0, 0.0,
+            1.0, 0.0,
+            1.0, 1.0,
+            0.0, 1.0,
+            // Left face
+            0.0, 0.0,
+            1.0, 0.0,
+            1.0, 1.0,
+            0.0, 1.0,
+            // Right face
+            0.0, 0.0,
+            1.0, 0.0,
+            1.0, 1.0,
+            0.0, 1.0,
+            // Top face
+            0.0, 0.0,
+            1.0, 0.0,
+            1.0, 1.0,
+            0.0, 1.0,
+            // Bottom face
+            0.0, 0.0,
+            1.0, 0.0,
+            1.0, 1.0,
+            0.0, 1.0,
+        ]);
+
 
         const cubeNormals = new Float32Array([
             // Front face
@@ -137,6 +188,8 @@
             attribute vec4 a_position;
             attribute vec4 a_color;
             attribute vec3 a_normal;
+            attribute vec2 a_texCoord;  // Add texture coordinate attribute
+            varying vec2 v_texCoord;
             varying vec3 v_normal;
             varying vec4 v_color;
             varying vec3 v_fragPos; // Pass the fragment position to the fragment shader
@@ -148,6 +201,7 @@
                 v_color = a_color;
                 v_normal = mat3(u_modelMatrix) * a_normal; // Transform normal to world space
                 v_fragPos = (u_modelMatrix * a_position).xyz; // Transform fragment position
+                v_texCoord = a_texCoord;
             }
         `;
 
@@ -157,6 +211,7 @@
             varying vec4 v_color;
             varying vec3 v_normal;
             varying vec3 v_fragPos;
+            varying vec2 v_texCoord;
             uniform vec3 uAmbientColor;
             uniform vec3 u_directionalLightDirection; // Direction of the directional light
             uniform vec3 u_directionalLightColor; // Color of the directional light
@@ -165,6 +220,7 @@
             uniform float u_pointLightIntensity; // Intensity of the point light
             uniform vec3 u_cameraPosition; // Add this uniform for specular calculations
             uniform float u_materialShininess; // Shininess of the material
+            uniform sampler2D u_texture;  // Add texture sampler
 
             void main() {
                 // Normalize the normal vector
@@ -192,7 +248,9 @@
 
                 // Combine ambient, diffuse, and specular lighting
                 vec3 lightColor = uAmbientColor + diffuseColorDirectional + diffuseColorPoint + (u_directionalLightColor * specular);
-                gl_FragColor = vec4(lightColor * v_color.rgb, v_color.a);
+                //gl_FragColor = vec4(lightColor * v_color.rgb, 1.0);
+                //gl_FragColor = vec4(lightColor * texture2D(u_texture, v_texCoord), 1.0);
+                gl_FragColor = vec4(lightColor, 1.0) * texture2D(u_texture, v_texCoord);
             }
         `;
 
@@ -211,14 +269,32 @@
         gl.linkProgram(program);
         gl.useProgram(program);
 
+        // Specify attribute and uniform locations
+        const positionAttributeLocation = gl.getAttribLocation(program, 'a_position');
+        const colorAttributeLocation = gl.getAttribLocation(program, 'a_color');
+        const texCoordLocation = gl.getAttribLocation(program, 'a_texCoord');
+        const normalAttributeLocation = gl.getAttribLocation(program, 'a_normal');
+        const modelMatrixLocation = gl.getUniformLocation(program, 'u_modelMatrix');
+        const modelViewProjectionMatrixLocation = gl.getUniformLocation(program, 'u_modelViewProjectionMatrix');
+        const textureLocation = gl.getUniformLocation(program, 'u_texture');
+
         // Create buffers for cube vertices and colors
         const positionBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, cubeVertices, gl.STATIC_DRAW);
 
+        
         const colorBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
         gl.bufferData(gl.ARRAY_BUFFER, cubeColors, gl.STATIC_DRAW);
+        
+        gl.activeTexture(gl.TEXTURE0);
+        gl.bindTexture(gl.TEXTURE_2D, cubeTexture);
+        gl.uniform1i(textureLocation, 0);
+
+        const texCoordBuffer = gl.createBuffer();
+        gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+        gl.bufferData(gl.ARRAY_BUFFER, cubeTextureCoordinates, gl.STATIC_DRAW);
 
         const normalBuffer = gl.createBuffer();
         gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
@@ -229,13 +305,6 @@
         gl.bindBuffer(gl.ELEMENT_ARRAY_BUFFER, indexBuffer);
         gl.bufferData(gl.ELEMENT_ARRAY_BUFFER, cubeIndices, gl.STATIC_DRAW);
 
-        // Specify attribute and uniform locations
-        const positionAttributeLocation = gl.getAttribLocation(program, 'a_position');
-        const colorAttributeLocation = gl.getAttribLocation(program, 'a_color');
-        const normalAttributeLocation = gl.getAttribLocation(program, 'a_normal');
-        const modelMatrixLocation = gl.getUniformLocation(program, 'u_modelMatrix');
-        const modelViewProjectionMatrixLocation = gl.getUniformLocation(program, 'u_modelViewProjectionMatrix');
-
         // Set up attribute pointers
         gl.bindBuffer(gl.ARRAY_BUFFER, positionBuffer);
         gl.enableVertexAttribArray(positionAttributeLocation);
@@ -244,6 +313,10 @@
         gl.bindBuffer(gl.ARRAY_BUFFER, colorBuffer);
         gl.enableVertexAttribArray(colorAttributeLocation);
         gl.vertexAttribPointer(colorAttributeLocation, 4, gl.FLOAT, false, 0, 0);
+
+        gl.bindBuffer(gl.ARRAY_BUFFER, texCoordBuffer);
+        gl.enableVertexAttribArray(texCoordLocation);
+        gl.vertexAttribPointer(texCoordLocation, 2, gl.FLOAT, false, 0, 0);
 
         gl.bindBuffer(gl.ARRAY_BUFFER, normalBuffer);
         gl.enableVertexAttribArray(normalAttributeLocation);
